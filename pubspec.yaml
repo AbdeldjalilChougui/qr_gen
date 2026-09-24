@@ -1,0 +1,27 @@
+name: qr_gen
+description: >-
+  A maintained QR code generator. Pure-Dart ISO/IEC 18004 encoder (all 40
+  versions, L/M/Q/H, auto segmentation) plus a Flutter widget, painter and SVG.
+version: 0.1.0
+homepage: https://abdeldjalilchougui.biz/
+repository: https://github.com/AbeldjalilChougui/qr_gen
+issue_tracker: https://github.com/AbeldjalilChougui/qr_gen/issues
+topics:
+  - qr
+  - qrcode
+  - barcode
+  - widget
+  - svg
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter

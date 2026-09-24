@@ -1,0 +1,11 @@
+.dart_tool/
+build/
+pubspec.lock
+.idea/
+*.iml
+.flutter-plugins*
+.metadata
+example/android/.gradle
+local.properties
+.DS_Store
+coverage/

@@ -1,0 +1,21 @@
+name: qr_gen_example
+description: Demonstrates the qr_gen package.
+publish_to: none
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  qr_gen:
+    path: ../
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
