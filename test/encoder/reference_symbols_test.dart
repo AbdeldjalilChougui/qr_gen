@@ -1,27 +1,21 @@
-// Byte-for-byte checks against two published worked examples:
+// Byte-for-byte checks against reference symbols.
 //
-// 1. ISO/IEC 18004:2015 Annex I.2: "01234567" as a version 1-M symbol.
-//    Data and EC codewords are printed in the text (Steps 1-2); the text states
-//    that data mask pattern 010 is selected (Step 4); Figure I.2 shows the final
-//    symbol (test/fixtures/iso_annex_i_1m_final.txt).
-// 2. thonky.com QR Code Tutorial: "HELLO WORLD". The data encoding page gives
-//    the 1-Q data codewords, the error correction page works the 1-M EC
-//    codewords, and the final page shows the finished 1-Q symbol
-//    (test/fixtures/thonky_hello_world_1q_final.txt).
-//
-// The two sources disagree on mask selection for HELLO WORLD 1-Q. The
-// tutorial's data masking page scores all eight masks and says mask 0 has the
-// lowest penalty, but its final image carries mask 6 in its format
-// information. The penalty reading used here (see penaltyRule3) selects 010
-// for the ISO example, as the standard says, and 0 for HELLO WORLD, as the
-// masking page says; libqrencode 4 and zint 2 select the same two masks. The
-// final-image comparison therefore forces mask 6.
+// 1. ISO/IEC 18004:2015 Annex I: "01234567" as a version 1-M symbol. The
+//    standard gives the data codewords, the error correction codewords and
+//    the selected data mask pattern (010).
+// 2. Symbols generated with qrencode 4.1.1 (libqrencode) for "01234567" 1-M
+//    and "HELLO WORLD" 1-M and 1-Q (test/fixtures/qrencode_*.txt; the command
+//    line is in each file's header). Their codewords are read back with the
+//    test-only decoder (test/support/decoder.dart), which also confirms the
+//    text, version, level and mask. The encoder must reproduce the codewords,
+//    the mask and every module.
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:qr_gen/qr_gen.dart';
 import 'package:qr_gen/src/encoder/codewords.dart';
 import 'package:qr_gen/src/encoder/reed_solomon.dart';
 
+import '../support/decoder.dart';
 import '../support/fixtures.dart';
 
 List<int> _bin(String s) =>
@@ -38,8 +32,45 @@ void _expectGrid(QrMatrix m, List<List<bool>> expected) {
   expect(diffs, isEmpty, reason: 'modules that differ');
 }
 
+/// Checks our encoder against a qrencode-generated fixture.
+void _checkQrencodeFixture({
+  required String fixture,
+  required String text,
+  required QrSegment segment,
+  required QrEcLevel level,
+  required int ecBits,
+  required int ecLength,
+}) {
+  final grid = fixtureGrid(fixture);
+  final reference = decodeGrid(grid);
+
+  test('fixture decodes to the input (test-only decoder)', () {
+    expect(reference.text, text);
+    expect(reference.version, 1);
+    expect(reference.ecBits, ecBits);
+  });
+
+  test('data codewords match', () {
+    expect(
+        buildDataCodewords([segment], 1, level), reference.dataBlocks.single);
+  });
+
+  test('error correction codewords match', () {
+    final data = buildDataCodewords([segment], 1, level);
+    expect(reedSolomonRemainder(data, ecLength), reference.ecBlocks.single);
+  });
+
+  test('mask choice matches (${reference.mask})', () {
+    expect(QrEncoder.encode(text, ecLevel: level).mask, reference.mask);
+  });
+
+  test('final symbol matches module for module', () {
+    _expectGrid(QrEncoder.encode(text, ecLevel: level), grid);
+  });
+}
+
 void main() {
-  group('ISO/IEC 18004 Annex I: 01234567 1-M', () {
+  group('ISO/IEC 18004:2015 Annex I: 01234567 1-M', () {
     final segments = [QrSegment.numeric('01234567')];
 
     test('data codewords (Step 1)', () {
@@ -73,49 +104,38 @@ void main() {
       expect(m.ecLevel, QrEcLevel.medium);
       expect(m.mask, 2);
     });
-
-    test('final symbol matches Figure I.2 module for module', () {
-      final m = QrEncoder.encode('01234567', ecLevel: QrEcLevel.medium);
-      _expectGrid(m, fixtureGrid('iso_annex_i_1m_final.txt'));
-    });
   });
 
-  group('thonky.com HELLO WORLD', () {
-    final segments = [QrSegment.alphanumeric('HELLO WORLD')];
+  group('qrencode 4.1.1: 01234567 1-M', () {
+    _checkQrencodeFixture(
+      fixture: 'qrencode_01234567_1m.txt',
+      text: '01234567',
+      segment: QrSegment.numeric('01234567'),
+      level: QrEcLevel.medium,
+      ecBits: 0,
+      ecLength: 10,
+    );
+  });
 
-    test('1-Q data codewords', () {
-      expect(buildDataCodewords(segments, 1, QrEcLevel.quartile),
-          [32, 91, 11, 120, 209, 114, 220, 77, 67, 64, 236, 17, 236]);
-    });
+  group('qrencode 4.1.1: HELLO WORLD 1-M', () {
+    _checkQrencodeFixture(
+      fixture: 'qrencode_hello_world_1m.txt',
+      text: 'HELLO WORLD',
+      segment: QrSegment.alphanumeric('HELLO WORLD'),
+      level: QrEcLevel.medium,
+      ecBits: 0,
+      ecLength: 10,
+    );
+  });
 
-    test('1-M data and error correction codewords', () {
-      final data = buildDataCodewords(segments, 1, QrEcLevel.medium);
-      expect(data, [
-        32, 91, 11, 120, 209, 114, 220, 77, //
-        67, 64, 236, 17, 236, 17, 236, 17,
-      ]);
-      expect(reedSolomonRemainder(data, 10),
-          [196, 35, 39, 119, 235, 215, 231, 226, 93, 23]);
-    });
-
-    test('1-Q error correction codewords (read back from the final symbol)',
-        () {
-      final data = buildDataCodewords(segments, 1, QrEcLevel.quartile);
-      expect(reedSolomonRemainder(data, 13),
-          [168, 72, 22, 82, 217, 54, 156, 0, 46, 15, 180, 122, 16]);
-    });
-
-    test('1-Q mask choice is pattern 0 (data masking page)', () {
-      final m = QrEncoder.encode('HELLO WORLD', ecLevel: QrEcLevel.quartile);
-      expect(m.version, 1);
-      expect(m.mask, 0);
-    });
-
-    test('1-Q final symbol (mask 6) matches the tutorial module for module',
-        () {
-      final m =
-          QrEncoder.encode('HELLO WORLD', ecLevel: QrEcLevel.quartile, mask: 6);
-      _expectGrid(m, fixtureGrid('thonky_hello_world_1q_final.txt'));
-    });
+  group('qrencode 4.1.1: HELLO WORLD 1-Q', () {
+    _checkQrencodeFixture(
+      fixture: 'qrencode_hello_world_1q.txt',
+      text: 'HELLO WORLD',
+      segment: QrSegment.alphanumeric('HELLO WORLD'),
+      level: QrEcLevel.quartile,
+      ecBits: 3,
+      ecLength: 13,
+    );
   });
 }

@@ -11,7 +11,8 @@ import 'fixtures.dart';
 
 /// Result of decoding a grid.
 class Decoded {
-  Decoded(this.text, this.version, this.ecBits, this.mask, this.bytes);
+  Decoded(this.text, this.version, this.ecBits, this.mask, this.bytes,
+      this.dataBlocks, this.ecBlocks);
 
   /// Decoded text (byte segments as ISO-8859-1 unless an ECI 26 was seen).
   final String text;
@@ -27,6 +28,12 @@ class Decoded {
 
   /// Raw bytes of byte-mode segments.
   final List<int> bytes;
+
+  /// Data codewords of each block, de-interleaved.
+  final List<List<int>> dataBlocks;
+
+  /// Error correction codewords of each block, de-interleaved.
+  final List<List<int>> ecBlocks;
 }
 
 final _blocks = <String, List<List<int>>>{};
@@ -316,5 +323,6 @@ Decoded decodeGrid(List<List<bool>> grid) {
         throw StateError('Unknown mode $mode');
     }
   }
-  return Decoded(out.toString(), version, ecBits, mask, allBytes);
+  return Decoded(
+      out.toString(), version, ecBits, mask, allBytes, blocks, ecBlocks);
 }
