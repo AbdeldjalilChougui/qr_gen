@@ -1,122 +1,172 @@
 import 'package:flutter/material.dart';
+import 'dart:ui';
 
-void main() {
-  runApp(const MyApp());
+import 'package:flutter/services.dart';
+import 'package:qr_gen/qr_gen.dart';
+
+void main() => runApp(const QrGenExampleApp());
+
+/// Demonstrates qr_gen: live encoding, styles, embedded image, export.
+class QrGenExampleApp extends StatelessWidget {
+  /// Creates the app.
+  const QrGenExampleApp({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+        title: 'qr_gen example',
+        theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+        home: const QrDemoPage(),
+      );
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+/// The single demo page.
+class QrDemoPage extends StatefulWidget {
+  /// Creates the page.
+  const QrDemoPage({super.key});
 
-  // This widget is the root of your application.
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
+  State<QrDemoPage> createState() => _QrDemoPageState();
+}
+
+class _QrDemoPageState extends State<QrDemoPage> {
+  final _controller =
+      TextEditingController(text: 'https://pub.dev/packages/qr_gen');
+  QrEcLevel _level = QrEcLevel.medium;
+  QrModuleShape _eye = QrModuleShape.square;
+  QrModuleShape _module = QrModuleShape.square;
+  bool _logo = false;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
-}
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
+  Future<void> _copySvg() async {
+    final matrix = QrEncoder.encode(_controller.text, ecLevel: _level);
+    await Clipboard.setData(ClipboardData(text: matrix.toSvg()));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('SVG copied (version ${matrix.version}, '
+            'mask ${matrix.mask})')));
+  }
 
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
+  Future<void> _exportPng() async {
+    final painter =
+        QrPainter(data: _controller.text, errorCorrectionLevel: _level);
+    final bytes = await painter.toImageData(512);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Rendered a 512 x 512 PNG: '
+            '${bytes?.lengthInBytes ?? 0} bytes')));
   }
 
   @override
   Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
     return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
+      appBar: AppBar(title: const Text('qr_gen')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Center(
+            child: QrImageView(
+              data: _controller.text,
+              size: 240,
+              errorCorrectionLevel: _level,
+              eyeStyle: QrEyeStyle(shape: _eye, color: Colors.teal.shade900),
+              dataModuleStyle: QrDataModuleStyle(shape: _module),
+              embeddedImage: _logo ? const _LogoImage() : null,
+              embeddedImageStyle:
+                  const QrEmbeddedImageStyle(size: Size(48, 48)),
+              semanticsLabel: 'QR code for ${_controller.text}',
+              errorStateBuilder: (context, error) => const SizedBox.square(
+                dimension: 240,
+                child: Center(child: Text('Too much data for a QR code')),
+              ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _controller,
+            maxLines: 3,
+            decoration: const InputDecoration(
+                labelText: 'Data', border: OutlineInputBorder()),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 16),
+          _choice<QrEcLevel>('Error correction', QrEcLevel.values, _level,
+              (v) => setState(() => _level = v)),
+          _choice<QrModuleShape>('Eyes', QrModuleShape.values, _eye,
+              (v) => setState(() => _eye = v)),
+          _choice<QrModuleShape>('Modules', QrModuleShape.values, _module,
+              (v) => setState(() => _module = v)),
+          SwitchListTile(
+            title: const Text('Embedded logo (use level Q or H)'),
+            value: _logo,
+            onChanged: (v) => setState(() {
+              _logo = v;
+              if (v) _level = QrEcLevel.high;
+            }),
+          ),
+          Wrap(spacing: 8, children: [
+            FilledButton.tonal(
+                onPressed: _copySvg, child: const Text('Copy SVG')),
+            FilledButton.tonal(
+                onPressed: _exportPng, child: const Text('Export PNG')),
+          ]),
+        ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
     );
   }
+
+  Widget _choice<T extends Enum>(
+      String label, List<T> values, T selected, ValueChanged<T> onChanged) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(children: [
+        SizedBox(width: 120, child: Text(label)),
+        Expanded(
+          child: Wrap(spacing: 4, children: [
+            for (final v in values)
+              ChoiceChip(
+                label: Text(v.name),
+                selected: v == selected,
+                onSelected: (_) => onChanged(v),
+              ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+/// A tiny generated logo, so the example needs no asset files.
+class _LogoImage extends ImageProvider<_LogoImage> {
+  const _LogoImage();
+
+  @override
+  Future<_LogoImage> obtainKey(ImageConfiguration configuration) =>
+      Future.value(this);
+
+  @override
+  ImageStreamCompleter loadImage(_LogoImage key, ImageDecoderCallback decode) =>
+      OneFrameImageStreamCompleter(_draw());
+
+  static Future<ImageInfo> _draw() async {
+    final recorder = PictureRecorder();
+    final canvas = Canvas(recorder);
+    canvas.drawRRect(
+        RRect.fromRectAndRadius(
+            const Rect.fromLTWH(0, 0, 96, 96), const Radius.circular(20)),
+        Paint()..color = Colors.teal);
+    canvas.drawCircle(const Offset(48, 48), 22, Paint()..color = Colors.white);
+    final image = await recorder.endRecording().toImage(96, 96);
+    return ImageInfo(image: image);
+  }
+
+  @override
+  bool operator ==(Object other) => other is _LogoImage;
+
+  @override
+  int get hashCode => 0;
 }

@@ -1,30 +1,25 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:qr_gen/qr_gen.dart';
 import 'package:qr_gen_example/main.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
-
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
+  testWidgets('shows a QR code that follows the text field', (tester) async {
+    await tester.pumpWidget(const QrGenExampleApp());
+    expect(find.byType(QrImageView), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'a' * 3000);
     await tester.pump();
+    expect(find.text('Too much data for a QR code'), findsOneWidget);
+    await tester.enterText(find.byType(TextField), 'short');
+    await tester.pump();
+    expect(find.text('Too much data for a QR code'), findsNothing);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('style chips update the code', (tester) async {
+    await tester.pumpWidget(const QrGenExampleApp());
+    await tester.tap(find.widgetWithText(ChoiceChip, 'circle').first);
+    await tester.pump();
+    final view = tester.widget<QrImageView>(find.byType(QrImageView));
+    expect(view.eyeStyle.shape, QrModuleShape.circle);
   });
 }
