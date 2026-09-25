@@ -6,3 +6,6 @@
 library;
 
 export 'qr_encoder.dart';
+export 'src/widget/qr_image_view.dart';
+export 'src/widget/qr_painter.dart';
+export 'src/widget/styles.dart';
